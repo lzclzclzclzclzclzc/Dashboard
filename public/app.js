@@ -201,6 +201,37 @@ async function loadDeepSeek() {
   }
 }
 
+function renderProcessTable(tbodyId, list) {
+  const tbody = $(tbodyId);
+  if (!list || list.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5">No data</td></tr>';
+    return;
+  }
+  tbody.innerHTML = list
+    .map((proc, i) => `
+      <tr>
+        <td class="rank">${i + 1}</td>
+        <td class="proc-name" title="${proc.Name}">${proc.Name}</td>
+        <td>${proc.Id}</td>
+        <td>${proc.CPU}</td>
+        <td>${proc.MemMB}</td>
+      </tr>
+    `)
+    .join("");
+}
+
+async function loadProcesses() {
+  try {
+    const response = await fetch("/api/processes", { cache: "no-store" });
+    const data = await response.json();
+    renderProcessTable("cpuProcBody", data.cpu);
+    renderProcessTable("memProcBody", data.memory);
+  } catch (error) {
+    $("cpuProcBody").innerHTML = `<tr><td colspan="5">${error.message}</td></tr>`;
+    $("memProcBody").innerHTML = `<tr><td colspan="5">${error.message}</td></tr>`;
+  }
+}
+
 function refreshCharts() {
   renderLineChart($("cpuChart"), cpuHistory, "#c78f2d");
   renderLineChart($("memoryChart"), memoryHistory, "#286f9b");
@@ -209,8 +240,10 @@ function refreshCharts() {
 loadSystem();
 loadDrive();
 loadDeepSeek();
+loadProcesses();
 
 setInterval(loadSystem, 1000);
 setInterval(loadDrive, 10000);
 setInterval(loadDeepSeek, 60000);
+setInterval(loadProcesses, 3000);
 window.addEventListener("resize", refreshCharts);

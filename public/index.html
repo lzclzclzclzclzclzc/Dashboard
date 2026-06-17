@@ -89,6 +89,46 @@
           <canvas id="memoryChart" width="720" height="260"></canvas>
         </article>
       </section>
+
+      <section class="process-grid">
+        <article class="process-card">
+          <div class="chart-head">
+            <div>
+              <p class="eyebrow">Top 10 by CPU Time</p>
+              <h2>CPU Processes</h2>
+            </div>
+          </div>
+          <div class="process-table-wrap">
+            <table class="process-table">
+              <thead>
+                <tr><th>#</th><th>Process</th><th>PID</th><th>CPU (s)</th><th>Mem (MB)</th></tr>
+              </thead>
+              <tbody id="cpuProcBody">
+                <tr><td colspan="5">Loading</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="process-card">
+          <div class="chart-head">
+            <div>
+              <p class="eyebrow">Top 10 by Memory</p>
+              <h2>Memory Processes</h2>
+            </div>
+          </div>
+          <div class="process-table-wrap">
+            <table class="process-table">
+              <thead>
+                <tr><th>#</th><th>Process</th><th>PID</th><th>CPU (s)</th><th>Mem (MB)</th></tr>
+              </thead>
+              <tbody id="memProcBody">
+                <tr><td colspan="5">Loading</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
     </main>
     <script src="/app.js"></script>
   </body>
