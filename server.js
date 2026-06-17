@@ -17,6 +17,7 @@ const PORT = Number(process.env.PORT || 3000);
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || "";
 const LHM_DATA_URL = process.env.LIBRE_HARDWARE_MONITOR_URL || "http://192.168.18.154:8085/data.json";
 const CPU_POWER_SENSOR_ID = process.env.CPU_POWER_SENSOR_ID || "/intelcpu/0/power/0";
+const CPU_TEMP_SENSOR_ID = process.env.CPU_TEMP_SENSOR_ID || "/intelcpu/0/temperature/18";
 const MIME = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -27,6 +28,7 @@ const MIME = {
 
 let previousCpu = readCpuSnapshot();
 let cpuPowerCache = { at: 0, value: null, retryAfter: 0 };
+let cpuTempCache = { at: 0, value: null, retryAfter: 0 };
 
 function loadEnv(file) {
   if (!fs.existsSync(file)) return;
@@ -152,7 +154,9 @@ async function getMetrics() {
 
 async function getSystemMetrics() {
   const cpu = getCpuUsage();
-  cpu.power_watts = await getCpuPowerWatts();
+  const [power, temp] = await Promise.all([getCpuPowerWatts(), getCpuTempCelsius()]);
+  cpu.power_watts = power;
+  cpu.temp_celsius = temp;
   return {
     at: new Date().toISOString(),
     host: {
@@ -203,6 +207,29 @@ async function getTopProcesses() {
     };
   } catch (error) {
     return { cpu: [], memory: [], error: error.message };
+  }
+}
+
+async function getCpuTempCelsius() {
+  const now = Date.now();
+  if (now < cpuTempCache.retryAfter) return cpuTempCache.value;
+  if (now - cpuTempCache.at < 900) return cpuTempCache.value;
+
+  try {
+    const data = await fetchJsonWithTimeout(LHM_DATA_URL, 2500);
+    const sensor = findSensor(data, (node) => node.SensorId === CPU_TEMP_SENSOR_ID)
+      || findSensor(data, (node) => node.Type === "Temperature" && /cpu package/i.test(node.Text || ""))
+      || findSensor(data, (node) => node.Text === "CPU Package");
+    const temp = sensor ? parseSensorNumber(sensor.RawValue || sensor.Value) : null;
+    cpuTempCache = {
+      at: now,
+      value: temp,
+      retryAfter: temp === null ? now + 5000 : now
+    };
+    return temp;
+  } catch {
+    cpuTempCache = { at: now, value: null, retryAfter: now + 5000 };
+    return null;
   }
 }
 

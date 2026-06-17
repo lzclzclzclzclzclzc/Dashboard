@@ -203,21 +203,36 @@ h2 {
   font-family: Georgia, "Times New Roman", serif;
 }
 
+.dual-ring {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 20px;
+}
+
 .ring {
-  width: 200px;
-  height: 200px;
-  margin: 28px auto 18px;
+  width: 130px;
+  height: 130px;
   display: grid;
   place-items: center;
   border-radius: 50%;
   background: conic-gradient(var(--gold) calc(var(--value) * 1%), rgba(255, 255, 255, 0.12) 0);
   position: relative;
+  flex-shrink: 0;
+}
+
+.ring.temp {
+  background: conic-gradient(#e06040 calc(var(--value) * 1%), rgba(255, 255, 255, 0.12) 0);
+}
+
+.ring.power {
+  background: conic-gradient(var(--gold) calc(var(--value) * 1%), rgba(255, 255, 255, 0.12) 0);
 }
 
 .ring::after {
   content: "";
   position: absolute;
-  inset: 20px;
+  inset: 14px;
   border-radius: inherit;
   background: #181818;
 }
@@ -225,7 +240,7 @@ h2 {
 .ring span {
   position: relative;
   z-index: 1;
-  font-size: 36px;
+  font-size: 24px;
   font-weight: 800;
 }
 

@@ -27,8 +27,13 @@
             <span>CPU</span>
             <strong id="cpuPercent">--%</strong>
           </div>
-          <div class="ring" style="--value: 0">
-            <span id="cpuRing">--%</span>
+          <div class="dual-ring">
+            <div class="ring temp" style="--value: 0">
+              <span id="cpuTempRing">--°C</span>
+            </div>
+            <div class="ring power" style="--value: 0">
+              <span id="cpuPowerRing">--W</span>
+            </div>
           </div>
           <p id="cpuModel">Reading</p>
           <div class="spark" id="cpuSpark"></div>

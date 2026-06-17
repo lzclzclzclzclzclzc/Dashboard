@@ -107,9 +107,14 @@ function renderSystem(data) {
   pushSample(cpuHistory, cpu);
   pushSample(memoryHistory, memory);
 
+  const cpuTemp = data.cpu.temp_celsius;
+  const hasCpuTemp = typeof cpuTemp === "number";
+
   setText("cpuPercent", `${cpu}%`);
-  setText("cpuRing", hasCpuPower ? `${cpuPower}W` : "--W");
-  $("cpuRing").parentElement.style.setProperty("--value", hasCpuPower ? Math.min(100, (cpuPower / 40) * 100) : 0);
+  setText("cpuTempRing", hasCpuTemp ? `${cpuTemp}°C` : "--°C");
+  $("cpuTempRing").parentElement.style.setProperty("--value", hasCpuTemp ? Math.min(100, (cpuTemp / 100) * 100) : 0);
+  setText("cpuPowerRing", hasCpuPower ? `${cpuPower}W` : "--W");
+  $("cpuPowerRing").parentElement.style.setProperty("--value", hasCpuPower ? Math.min(100, (cpuPower / 40) * 100) : 0);
   setText("cpuModel", data.cpu.model);
   renderSpark(cpu);
 
