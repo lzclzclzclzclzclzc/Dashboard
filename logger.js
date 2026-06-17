@@ -3,7 +3,7 @@ const path = require("path");
 const http = require("http");
 
 const DB_PATH = path.join(__dirname, "data", "telemetry.db");
-const POLL_MS = 10_000;
+const POLL_MS = 60_000;
 const RETENTION_DAYS = 30;
 const BASE_URL = `http://localhost:${process.env.PORT || 3000}`;
 
