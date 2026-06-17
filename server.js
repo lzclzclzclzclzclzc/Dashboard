@@ -11,6 +11,8 @@ const PUBLIC_DIR = path.join(ROOT, "public");
 const DATA_DIR = path.join(ROOT, "data");
 const BASELINE_FILE = path.join(DATA_DIR, "deepseek-baseline.json");
 
+require("./logger");
+
 loadEnv(path.join(ROOT, ".env"));
 
 const PORT = Number(process.env.PORT || 3000);
