@@ -434,6 +434,124 @@ canvas {
   text-overflow: ellipsis;
 }
 
+/* Reports Section */
+.reports-section {
+  margin-top: 16px;
+}
+
+.report-card {
+  border: 1px solid var(--line);
+  background: rgba(255, 250, 240, 0.86);
+  box-shadow: var(--shadow);
+  border-radius: 8px;
+  padding: 18px;
+}
+
+.reports-list {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.report-item {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(255, 250, 240, 0.5);
+  transition: border-color 150ms ease;
+}
+
+.report-item:hover {
+  border-color: var(--gold);
+}
+
+.report-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 18px;
+  color: var(--ink);
+  text-align: left;
+}
+
+.report-toggle:hover {
+  background: rgba(199, 143, 45, 0.06);
+}
+
+.report-toggle .toggle-icon {
+  flex: 0 0 auto;
+  font-size: 14px;
+  color: var(--muted);
+  transition: transform 200ms ease;
+}
+
+.report-item.open .toggle-icon {
+  transform: rotate(180deg);
+}
+
+.report-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.report-meta .report-period {
+  font-weight: bold;
+}
+
+.report-meta .report-size {
+  font-size: 13px;
+  color: var(--muted);
+  font-family: "Aptos", "Segoe UI", sans-serif;
+}
+
+.report-body {
+  display: none;
+  border-top: 1px solid var(--line);
+}
+
+.report-item.open .report-body {
+  display: block;
+}
+
+.report-body iframe {
+  width: 100%;
+  height: 70vh;
+  min-height: 500px;
+  border: none;
+  background: #fff;
+}
+
+.report-btn {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 8px 18px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 250, 240, 0.72);
+  color: var(--muted);
+  font-family: "Aptos", "Segoe UI", sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.report-btn:hover {
+  border-color: var(--gold);
+  color: var(--ink);
+  background: rgba(255, 250, 240, 0.9);
+}
+
 @media (max-width: 980px) {
   .hero-grid {
     grid-template-columns: 1fr 1fr;

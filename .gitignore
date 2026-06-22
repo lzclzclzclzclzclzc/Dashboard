@@ -9,3 +9,5 @@ data_ex.*
 input.svg
 output.png
 svg2png.py
+public/reports/
+_q.js

@@ -242,13 +242,79 @@ function refreshCharts() {
   renderLineChart($("memoryChart"), memoryHistory, "#286f9b");
 }
 
+async function loadReports() {
+  try {
+    const response = await fetch("/api/reports", { cache: "no-store" });
+    const reports = await response.json();
+    const currentFiles = [...document.querySelectorAll(".report-item")].map(el => el.dataset.file);
+    const newFiles = reports.slice(0, 3).map(r => r.file);
+    if (JSON.stringify(currentFiles) !== JSON.stringify(newFiles)) {
+      renderReports(reports.slice(0, 3));
+    }
+  } catch (error) {
+    $("reportsList").innerHTML = `<p class="muted">${error.message}</p>`;
+  }
+}
+
+function renderReports(reports) {
+  const list = $("reportsList");
+  // Preserve open state before re-render
+  const openFiles = new Set(
+    [...document.querySelectorAll(".report-item.open")].map(el => el.dataset.file)
+  );
+  if (!reports || reports.length === 0) {
+    list.innerHTML = '<p class="muted">No reports yet. Run telemetry-report skill to generate one.</p>';
+    return;
+  }
+  list.innerHTML = reports.map((r, i) => {
+    const date = new Date(r.generated);
+    const label = date.toLocaleString("zh-CN", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" });
+    const size = r.size > 1024*1024 ? `${(r.size/(1024*1024)).toFixed(1)} MB` : `${Math.round(r.size/1024)} KB`;
+    const id = `report-${i}`;
+    const wasOpen = openFiles.has(r.file);
+    return `
+      <div class="report-item${wasOpen ? ' open' : ''}" id="${id}" data-file="${r.file}">
+        <button class="report-toggle" onclick="toggleReport('${id}','${r.file}')">
+          <div class="report-meta">
+            <span class="report-period">${label}</span>
+            <span class="report-size">${size}</span>
+          </div>
+          <span class="toggle-icon">▼</span>
+        </button>
+        <div class="report-body">
+          <iframe src="${wasOpen ? '/reports/' + r.file : 'about:blank'}" data-src="/reports/${r.file}"></iframe>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function toggleReport(id, file) {
+  const item = document.getElementById(id);
+  const isOpen = item.classList.contains("open");
+  const iframe = item.querySelector("iframe");
+
+  if (isOpen) {
+    item.classList.remove("open");
+    return;
+  }
+
+  item.classList.add("open");
+  if (iframe && iframe.dataset.src && iframe.src === "about:blank") {
+    iframe.src = iframe.dataset.src;
+  }
+}
+
 loadSystem();
 loadDrive();
 loadDeepSeek();
 loadProcesses();
+loadReports();
 
 setInterval(loadSystem, 1000);
 setInterval(loadDrive, 10000);
 setInterval(loadDeepSeek, 60000);
 setInterval(loadProcesses, 3000);
+setInterval(loadReports, 30000);
 window.addEventListener("resize", refreshCharts);
+$("refreshReportsBtn")?.addEventListener("click", loadReports);

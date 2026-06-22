@@ -15,6 +15,7 @@ require("./logger");
 
 loadEnv(path.join(ROOT, ".env"));
 
+const REPORTS_DIR = path.join(PUBLIC_DIR, "reports");
 const PORT = Number(process.env.PORT || 3000);
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || "";
 const LHM_DATA_URL = process.env.LIBRE_HARDWARE_MONITOR_URL || "http://192.168.18.154:8085/data.json";
@@ -431,6 +432,10 @@ const server = http.createServer(async (request, response) => {
       sendJson(response, 200, await getTopProcesses());
       return;
     }
+    if (request.method === "GET" && url.pathname === "/api/reports") {
+      sendJson(response, 200, listReports());
+      return;
+    }
     if (request.method === "GET") {
       sendStatic(request, response);
       return;
@@ -440,6 +445,19 @@ const server = http.createServer(async (request, response) => {
     sendJson(response, 500, { error: error.message });
   }
 });
+
+function listReports() {
+  if (!fs.existsSync(REPORTS_DIR)) return [];
+  return fs.readdirSync(REPORTS_DIR)
+    .filter(f => f.endsWith(".html"))
+    .map(f => {
+      const stat = fs.statSync(path.join(REPORTS_DIR, f));
+      const match = f.match(/^report_(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2})\.html$/);
+      const range = match ? `${match[1]} ${match[2].replace('-',':')}` : f;
+      return { file: f, range, size: stat.size, generated: stat.mtime.toISOString() };
+    })
+    .sort((a, b) => b.generated.localeCompare(a.generated));
+}
 
 server.listen(PORT, () => {
   console.log(`Dashboard running at http://localhost:${PORT}`);
