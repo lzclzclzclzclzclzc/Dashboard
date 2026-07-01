@@ -12,9 +12,18 @@ from datetime import datetime, timedelta
 from collections import Counter, defaultdict
 
 # ── Time range helpers ──────────────────────────────────────────────
+def normalize_ts(ts):
+    """Accept YYYY-MM-DD HH:MM or YYYY-MM-DD HH:MM:SS, return full format."""
+    if ts is None:
+        return None
+    ts = ts.strip()
+    if len(ts) == 16:  # YYYY-MM-DD HH:MM
+        return ts + ":00"
+    return ts
+
 def get_time_filter(args):
     if args.range == "custom":
-        return args.from_ts, args.to_ts
+        return normalize_ts(args.from_ts), normalize_ts(args.to_ts)
     now = datetime.now()
     delta = {"1h": timedelta(hours=1), "24h": timedelta(hours=24),
              "7d": timedelta(days=7), "30d": timedelta(days=30)}
