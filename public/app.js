@@ -1,5 +1,10 @@
 const cpuHistory = [];
 const memoryHistory = [];
+const gpuUtilHistory = [];
+const gpuDedicatedHistory = [];
+const gpuSharedHistory = [];
+const gpuPowerHistory = [];
+let gpuMemTotal = 0;
 
 const $ = (id) => document.getElementById(id);
 
@@ -40,7 +45,14 @@ function renderSpark(value) {
     .join("");
 }
 
-function renderLineChart(canvas, values, color) {
+function normalizeSeries(input) {
+  if (!input || input.length === 0) return [];
+  if (typeof input[0] === "number") return [{ values: input, color: "#c78f2d" }];
+  return input;
+}
+
+function renderLineChart(canvas, input, color, yMax) {
+  const seriesList = normalizeSeries(input);
   const ctx = canvas.getContext("2d");
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
@@ -53,6 +65,8 @@ function renderLineChart(canvas, values, color) {
   }
 
   ctx.clearRect(0, 0, width, height);
+
+  // grid lines
   ctx.lineWidth = 1 * dpr;
   ctx.strokeStyle = "rgba(21, 21, 21, 0.08)";
   for (let i = 0; i <= 4; i += 1) {
@@ -63,40 +77,50 @@ function renderLineChart(canvas, values, color) {
     ctx.stroke();
   }
 
-  if (values.length < 2) return;
-
   const padding = 10 * dpr;
   const usableWidth = width - padding * 2;
   const usableHeight = height - padding * 2;
   const step = usableWidth / 59;
-  const points = values.map((value, index) => {
-    const x = padding + (60 - values.length + index) * step;
-    const y = padding + usableHeight - (Math.max(0, Math.min(100, value)) / 100) * usableHeight;
-    return { x, y };
-  });
 
-  const gradient = ctx.createLinearGradient(0, padding, 0, height - padding);
-  gradient.addColorStop(0, `${color}33`);
-  gradient.addColorStop(1, `${color}00`);
+  for (const series of seriesList) {
+    const values = series.values;
+    const seriesColor = series.color;
+    if (values.length < 2) continue;
 
-  ctx.beginPath();
-  ctx.moveTo(points[0].x, height - padding);
-  for (const point of points) ctx.lineTo(point.x, point.y);
-  ctx.lineTo(points[points.length - 1].x, height - padding);
-  ctx.closePath();
-  ctx.fillStyle = gradient;
-  ctx.fill();
+    const ceiling = typeof yMax === "number" ? yMax : 100;
 
-  ctx.beginPath();
-  points.forEach((point, index) => {
-    if (index === 0) ctx.moveTo(point.x, point.y);
-    else ctx.lineTo(point.x, point.y);
-  });
-  ctx.lineWidth = 3 * dpr;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.strokeStyle = color;
-  ctx.stroke();
+    const points = values.map((value, index) => {
+      const x = padding + (60 - values.length + index) * step;
+      const clamped = Math.max(0, Math.min(ceiling, value));
+      const y = padding + usableHeight - (clamped / ceiling) * usableHeight;
+      return { x, y };
+    });
+
+    // gradient fill
+    const gradient = ctx.createLinearGradient(0, padding, 0, height - padding);
+    gradient.addColorStop(0, `${seriesColor}33`);
+    gradient.addColorStop(1, `${seriesColor}00`);
+
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, height - padding);
+    for (const point of points) ctx.lineTo(point.x, point.y);
+    ctx.lineTo(points[points.length - 1].x, height - padding);
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // line
+    ctx.beginPath();
+    points.forEach((point, index) => {
+      if (index === 0) ctx.moveTo(point.x, point.y);
+      else ctx.lineTo(point.x, point.y);
+    });
+    ctx.lineWidth = 2.5 * dpr;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = seriesColor;
+    ctx.stroke();
+  }
 }
 
 function renderSystem(data) {
@@ -206,6 +230,48 @@ async function loadDeepSeek() {
   }
 }
 
+function renderGpu(data) {
+  const util = data.utilization_gpu;
+  const memUsed = data.memory.dedicated_used_mb;
+  const memShared = data.memory.shared_used_mb ?? 0;
+  const memTotal = data.memory.dedicated_total_mb;
+  const powerDraw = data.power.draw_w;
+
+  gpuMemTotal = memTotal;
+
+  pushSample(gpuUtilHistory, util);
+  pushSample(gpuDedicatedHistory, memUsed);
+  pushSample(gpuSharedHistory, memShared);
+  pushSample(gpuPowerHistory, powerDraw);
+
+  // Row 1: GPU Utilization + GPU Power
+  setText("gpuUtilValue", `${util}%`);
+  setText("gpuPowerValue", `${powerDraw}W`);
+  renderLineChart($("gpuUtilChart"), gpuUtilHistory, "#c78f2d");
+
+  const maxPower = Math.max(10, ...gpuPowerHistory, 50);
+  const powerCeiling = Math.ceil(maxPower / 50) * 50;
+  renderLineChart($("gpuPowerChart"), gpuPowerHistory, "#e06040", powerCeiling);
+
+  // Row 2: GPU Dedicated Memory + GPU Shared Memory (separate charts with values)
+  setText("gpuDedicatedValue", `${(memUsed / 1024).toFixed(1)} / ${(memTotal / 1024).toFixed(1)} GB`);
+  setText("gpuSharedValue", `${memShared.toFixed(1)} MiB`);
+
+  const memCeiling = memTotal > 0 ? memTotal : 16384;
+  renderLineChart($("gpuDedicatedChart"), gpuDedicatedHistory, "#c78f2d", memCeiling);
+
+  const sharedCeiling = Math.max(memShared * 2, 256, ...gpuSharedHistory);
+  renderLineChart($("gpuSharedChart"), gpuSharedHistory, "#237a57", Math.ceil(sharedCeiling / 256) * 256);
+}
+
+async function loadGpu() {
+  try {
+    const response = await fetch("/api/gpu", { cache: "no-store" });
+    if (!response.ok) return;
+    renderGpu(await response.json());
+  } catch { /* GPU may not be available */ }
+}
+
 function renderProcessTable(tbodyId, list) {
   const tbody = $(tbodyId);
   if (!list || list.length === 0) {
@@ -240,6 +306,19 @@ async function loadProcesses() {
 function refreshCharts() {
   renderLineChart($("cpuChart"), cpuHistory, "#c78f2d");
   renderLineChart($("memoryChart"), memoryHistory, "#286f9b");
+  if (gpuUtilHistory.length > 0) renderLineChart($("gpuUtilChart"), gpuUtilHistory, "#c78f2d");
+  if (gpuPowerHistory.length > 0) {
+    const maxPower = Math.max(10, ...gpuPowerHistory, 50);
+    renderLineChart($("gpuPowerChart"), gpuPowerHistory, "#e06040", Math.ceil(maxPower / 50) * 50);
+  }
+  if (gpuDedicatedHistory.length > 0) {
+    const memCeiling = gpuMemTotal > 0 ? gpuMemTotal : 16384;
+    renderLineChart($("gpuDedicatedChart"), gpuDedicatedHistory, "#c78f2d", memCeiling);
+  }
+  if (gpuSharedHistory.length > 0) {
+    const sharedCeiling = Math.max(...gpuSharedHistory, 256) * 2;
+    renderLineChart($("gpuSharedChart"), gpuSharedHistory, "#237a57", Math.ceil(sharedCeiling / 256) * 256);
+  }
 }
 
 async function loadReports() {
@@ -309,12 +388,14 @@ loadSystem();
 loadDrive();
 loadDeepSeek();
 loadProcesses();
+loadGpu();
 loadReports();
 
 setInterval(loadSystem, 1000);
 setInterval(loadDrive, 10000);
 setInterval(loadDeepSeek, 60000);
 setInterval(loadProcesses, 3000);
+setInterval(loadGpu, 1000);
 setInterval(loadReports, 30000);
 window.addEventListener("resize", refreshCharts);
 $("refreshReportsBtn")?.addEventListener("click", loadReports);

@@ -135,6 +135,54 @@
         </article>
       </section>
 
+      <section class="chart-grid">
+        <article class="chart-card">
+          <div class="chart-head">
+            <div>
+              <p class="eyebrow">Last 60 Seconds</p>
+              <h2>GPU Utilization</h2>
+            </div>
+            <strong id="gpuUtilValue">--%</strong>
+          </div>
+          <canvas id="gpuUtilChart" width="720" height="260"></canvas>
+        </article>
+
+        <article class="chart-card">
+          <div class="chart-head">
+            <div>
+              <p class="eyebrow">Last 60 Seconds</p>
+              <h2>GPU Power</h2>
+            </div>
+            <strong id="gpuPowerValue">--W</strong>
+          </div>
+          <canvas id="gpuPowerChart" width="720" height="260"></canvas>
+        </article>
+      </section>
+
+      <section class="chart-grid">
+        <article class="chart-card">
+          <div class="chart-head">
+            <div>
+              <p class="eyebrow">Last 60 Seconds</p>
+              <h2>GPU Dedicated Memory</h2>
+            </div>
+            <strong id="gpuDedicatedValue">--</strong>
+          </div>
+          <canvas id="gpuDedicatedChart" width="720" height="260"></canvas>
+        </article>
+
+        <article class="chart-card">
+          <div class="chart-head">
+            <div>
+              <p class="eyebrow">Last 60 Seconds</p>
+              <h2>GPU Shared Memory</h2>
+            </div>
+            <strong id="gpuSharedValue">--</strong>
+          </div>
+          <canvas id="gpuSharedChart" width="720" height="260"></canvas>
+        </article>
+      </section>
+
       <section class="reports-section">
         <article class="report-card" id="reportsCard">
           <div class="chart-head">

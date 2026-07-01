@@ -18,23 +18,42 @@ function init() {
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS telemetry (
-      ts            TEXT PRIMARY KEY,
-      cpu_pct       REAL,
-      cpu_temp      REAL,
-      cpu_power     REAL,
-      mem_pct       REAL,
-      mem_used_gb   REAL,
-      mem_total_gb  REAL,
-      disk_free_gb  REAL,
-      disk_total_gb REAL,
-      disk_pct      REAL,
-      cpu_top10     TEXT,
-      mem_top10     TEXT,
-      ds_balance    TEXT,
-      ds_daily_used TEXT
+      ts                  TEXT PRIMARY KEY,
+      cpu_pct             REAL,
+      cpu_temp            REAL,
+      cpu_power           REAL,
+      mem_pct             REAL,
+      mem_used_gb         REAL,
+      mem_total_gb        REAL,
+      disk_free_gb        REAL,
+      disk_total_gb       REAL,
+      disk_pct            REAL,
+      cpu_top10           TEXT,
+      mem_top10           TEXT,
+      ds_balance          TEXT,
+      ds_daily_used       TEXT,
+      gpu_util            REAL,
+      gpu_mem_dedicated_mb REAL,
+      gpu_mem_shared_mb   REAL,
+      gpu_mem_total_mb    REAL,
+      gpu_power_w         REAL,
+      gpu_temp            REAL
     );
     CREATE INDEX IF NOT EXISTS idx_telemetry_ts ON telemetry(ts);
   `);
+
+  // Add GPU columns to existing databases
+  const gpuColumns = [
+    'gpu_util REAL',
+    'gpu_mem_dedicated_mb REAL',
+    'gpu_mem_shared_mb REAL',
+    'gpu_mem_total_mb REAL',
+    'gpu_power_w REAL',
+    'gpu_temp REAL'
+  ];
+  for (const col of gpuColumns) {
+    try { db.exec(`ALTER TABLE telemetry ADD COLUMN ${col}`); } catch { /* already exists */ }
+  }
 
   console.log(`[logger] SQLite ready at ${DB_PATH}`);
   schedule();
@@ -47,11 +66,12 @@ function schedule() {
 
 async function pollAndInsert() {
   try {
-    const [system, drive, deepseek, processes] = await Promise.all([
+    const [system, drive, deepseek, processes, gpu] = await Promise.all([
       fetchJson("/api/system"),
       fetchJson("/api/drive"),
       fetchJson("/api/deepseek"),
-      fetchJson("/api/processes")
+      fetchJson("/api/processes"),
+      fetchJson("/api/gpu")
     ]);
 
     const ts = localTimestamp();
@@ -64,13 +84,15 @@ async function pollAndInsert() {
          mem_pct, mem_used_gb, mem_total_gb,
          disk_free_gb, disk_total_gb, disk_pct,
          cpu_top10, mem_top10,
-         ds_balance, ds_daily_used)
+         ds_balance, ds_daily_used,
+         gpu_util, gpu_mem_dedicated_mb, gpu_mem_shared_mb, gpu_mem_total_mb, gpu_power_w, gpu_temp)
       VALUES
         (@ts, @cpu_pct, @cpu_temp, @cpu_power,
          @mem_pct, @mem_used_gb, @mem_total_gb,
          @disk_free_gb, @disk_total_gb, @disk_pct,
          @cpu_top10, @mem_top10,
-         @ds_balance, @ds_daily_used)
+         @ds_balance, @ds_daily_used,
+         @gpu_util, @gpu_mem_dedicated_mb, @gpu_mem_shared_mb, @gpu_mem_total_mb, @gpu_power_w, @gpu_temp)
     `);
 
     stmt.run({
@@ -89,7 +111,13 @@ async function pollAndInsert() {
       ds_balance: deepseek.balance?.ok
         ? safeJson(deepseek.balance.data?.balance_infos)
         : null,
-      ds_daily_used: safeJson(deepseek.daily?.items)
+      ds_daily_used: safeJson(deepseek.daily?.items),
+      gpu_util: gpu?.utilization_gpu ?? null,
+      gpu_mem_dedicated_mb: gpu?.memory?.dedicated_used_mb ?? null,
+      gpu_mem_shared_mb: gpu?.memory?.shared_used_mb ?? null,
+      gpu_mem_total_mb: gpu?.memory?.dedicated_total_mb ?? null,
+      gpu_power_w: gpu?.power?.draw_w ?? null,
+      gpu_temp: gpu?.temperature ?? null
     });
 
     // expire old rows
