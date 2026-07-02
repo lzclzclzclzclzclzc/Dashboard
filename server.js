@@ -2,6 +2,9 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
+// silence all console output
+["log", "error", "warn", "info", "debug"].forEach(k => { console[k] = () => {}; });
+
 // load .env before any config module reads it
 (function loadEnv(file) {
   if (!fs.existsSync(file)) return;
