@@ -9,14 +9,14 @@ async function getDriveUsage() {
     const { stdout } = await execFileAsync("powershell", [
       "-NoProfile", "-Command",
       "$d=[System.IO.DriveInfo]::new('C'); [pscustomobject]@{Size=$d.TotalSize;FreeSpace=$d.AvailableFreeSpace} | ConvertTo-Json -Compress",
-    ]);
+    ], { timeout: 5000 });
     const disk = JSON.parse(stdout.trim() || "{}");
     const total = Number(disk.Size || 0);
     const free = Number(disk.FreeSpace || 0);
     const used = Math.max(total - free, 0);
     return getDriveShape("C:", total, used, free);
   }
-  const { stdout } = await execFileAsync("df", ["-k", "/"]);
+  const { stdout } = await execFileAsync("df", ["-k", "/"], { timeout: 5000 });
   const [, line] = stdout.trim().split(/\r?\n/);
   const parts = line.trim().split(/\s+/);
   const total = Number(parts[1]) * 1024;

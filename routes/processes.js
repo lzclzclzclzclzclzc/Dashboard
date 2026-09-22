@@ -13,8 +13,8 @@ async function getTopProcesses() {
     const memCmd = `Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 10 | ForEach-Object { [pscustomobject]@{Name=$_.ProcessName;Id=$_.Id;CPU=$([math]::Round($_.CPU,1));MemMB=$([math]::Round($_.WorkingSet64/1MB,1))} } | ConvertTo-Json -Compress`;
 
     const [cpuResult, memResult] = await Promise.all([
-      execFileAsync("powershell", ["-NoProfile", "-Command", cpuCmd]),
-      execFileAsync("powershell", ["-NoProfile", "-Command", memCmd]),
+      execFileAsync("powershell", ["-NoProfile", "-Command", cpuCmd], { timeout: 5000 }),
+      execFileAsync("powershell", ["-NoProfile", "-Command", memCmd], { timeout: 5000 }),
     ]);
 
     const cpuList = JSON.parse(cpuResult.stdout.trim() || "[]");

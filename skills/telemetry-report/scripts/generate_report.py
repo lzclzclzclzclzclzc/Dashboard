@@ -19,7 +19,7 @@ Usage:
   python generate_report.py --db <path> --range 24h
 """
 
-import sqlite3, json, argparse, sys, os
+import sqlite3, json, argparse, sys, os, html
 from datetime import datetime, timedelta
 from collections import Counter, defaultdict
 
@@ -308,7 +308,7 @@ def build_html(rows, stats, hourly, from_ts, to_ts, analysis):
                 datetime.strptime(from_ts, "%Y-%m-%d %H:%M:%S"))
     duration_hours = duration.total_seconds() / 3600
 
-    def safe(v): return v if v is not None else "null"
+    def safe(v): return v if v is not None else None
     timestamps   = [r["ts"] for r in rows]
     cpu_arr      = [safe(r["cpu_pct"]) for r in rows]
     temp_arr     = [safe(r["cpu_temp"]) for r in rows]
@@ -465,11 +465,11 @@ tr:hover td{{background:rgba(255,255,255,0.02)}}
 <div class="grid-2">
 <div class="chart-section"><h2>CPU 使用最多的进程 Top 10</h2>
 <table><tr><th>进程名</th><th>最高 CPU 时间（s）</th></tr>
-{''.join(f'<tr><td>{n}</td><td>{v:.0f}</td></tr>' for n,v in cpu_procs[:10]) or '<tr><td colspan=2 style="color:var(--muted)">无数据</td></tr>'}
+{''.join(f'<tr><td>{html.escape(str(n))}</td><td>{v:.0f}</td></tr>' for n,v in cpu_procs[:10]) or '<tr><td colspan=2 style="color:var(--muted)">无数据</td></tr>'}
 </table></div>
 <div class="chart-section"><h2>内存占用最多的进程 Top 10</h2>
 <table><tr><th>进程名</th><th>最高内存（MB）</th></tr>
-{''.join(f'<tr><td>{n}</td><td>{v:.0f}</td></tr>' for n,v in mem_consumers[:10]) or '<tr><td colspan=2 style="color:var(--muted)">无数据</td></tr>'}
+{''.join(f'<tr><td>{html.escape(str(n))}</td><td>{v:.0f}</td></tr>' for n,v in mem_consumers[:10]) or '<tr><td colspan=2 style="color:var(--muted)">无数据</td></tr>'}
 </table></div>
 </div>
 

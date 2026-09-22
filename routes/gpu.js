@@ -14,7 +14,7 @@ async function discoverGpuInstance() {
     const { stdout } = await execFileAsync("powershell", [
       "-NoProfile", "-Command",
       "(Get-Counter '\\GPU Adapter Memory(*)\\Dedicated Usage' -ErrorAction SilentlyContinue).CounterSamples | Where-Object { $_.CookedValue -gt 0 } | ForEach-Object { $_.InstanceName } | Select-Object -First 1",
-    ]);
+    ], { timeout: 4000 });
     gpuInstanceName = stdout.trim();
     if (gpuInstanceName) console.log(`[gpu] discovered GPU perf instance: ${gpuInstanceName}`);
   } catch (err) {
@@ -29,7 +29,7 @@ async function getGpuMetrics() {
       execFileAsync("nvidia-smi", [
         "--query-gpu=name,utilization.gpu,utilization.memory,memory.used,memory.total,power.draw,power.limit,temperature.gpu",
         "--format=csv,noheader,nounits",
-      ]),
+      ], { timeout: 4000 }),
       discoverGpuInstance(),
     ]);
 
@@ -55,7 +55,7 @@ async function getGpuMetrics() {
         const { stdout: sharedOut } = await execFileAsync("powershell", [
           "-NoProfile", "-Command",
           `(Get-Counter "\\GPU Adapter Memory(${instance})\\Shared Usage" -ErrorAction SilentlyContinue).CounterSamples | Select-Object -ExpandProperty CookedValue`,
-        ]);
+        ], { timeout: 4000 });
         const rawShared = parseFloat(sharedOut.trim());
         if (Number.isFinite(rawShared)) {
           sharedMemMb = Math.round((rawShared / (1024 * 1024)) * 10) / 10;

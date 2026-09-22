@@ -9,6 +9,7 @@ const BASE_URL = `http://localhost:${process.env.PORT || 3000}`;
 
 let db;
 let timer;
+let polling = false;
 
 function init() {
   db = new Database(DB_PATH);
@@ -65,6 +66,8 @@ function schedule() {
 }
 
 async function pollAndInsert() {
+  if (polling) return; // skip if the previous cycle hasn't finished (avoids overlapping polls piling up)
+  polling = true;
   try {
     const [system, drive, deepseek, processes, gpu] = await Promise.all([
       fetchJson("/api/system"),
@@ -127,12 +130,14 @@ async function pollAndInsert() {
 
   } catch (err) {
     console.error(`[logger] poll error: ${err.message}`);
+  } finally {
+    polling = false;
   }
 }
 
 function fetchJson(pathname) {
   return new Promise((resolve, reject) => {
-    http.get(`${BASE_URL}${pathname}`, { headers: { "Cache-Control": "no-store" } }, (res) => {
+    const req = http.get(`${BASE_URL}${pathname}`, { headers: { "Cache-Control": "no-store" } }, (res) => {
       let body = "";
       res.on("data", (chunk) => (body += chunk));
       res.on("end", () => {
@@ -142,7 +147,9 @@ function fetchJson(pathname) {
           reject(new Error(`Invalid JSON from ${pathname}: ${e.message}`));
         }
       });
-    }).on("error", reject);
+    });
+    req.on("error", reject);
+    req.setTimeout(15000, () => req.destroy(new Error(`Timeout fetching ${pathname}`)));
   });
 }
 

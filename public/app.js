@@ -8,6 +8,12 @@ let gpuMemTotal = 0;
 
 const $ = (id) => document.getElementById(id);
 
+function esc(value) {
+  return String(value == null ? "" : value).replace(/[&<>"']/g, (c) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+  ));
+}
+
 function bytes(value) {
   if (!value) return "--";
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -36,6 +42,44 @@ function setBar(id, percent) {
 function pushSample(list, value) {
   list.push(value);
   if (list.length > 60) list.shift();
+}
+
+// Persist rolling chart history so a page refresh/reopen shows the full charts
+// immediately instead of redrawing from empty over the next 60s.
+const HISTORY_STORE_KEY = "clawDashboardHistory:v1";
+
+function saveHistory() {
+  try {
+    localStorage.setItem(HISTORY_STORE_KEY, JSON.stringify({
+      t: Date.now(),
+      cpu: cpuHistory,
+      mem: memoryHistory,
+      gpuUtil: gpuUtilHistory,
+      gpuDedicated: gpuDedicatedHistory,
+      gpuShared: gpuSharedHistory,
+      gpuPower: gpuPowerHistory,
+      gpuMemTotal,
+    }));
+  } catch { /* storage disabled/full — non-fatal */ }
+}
+
+function restoreHistory() {
+  try {
+    const raw = localStorage.getItem(HISTORY_STORE_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    const fill = (target, values) => {
+      if (!Array.isArray(values)) return;
+      for (const v of values.slice(-60)) target.push(v);
+    };
+    fill(cpuHistory, saved.cpu);
+    fill(memoryHistory, saved.mem);
+    fill(gpuUtilHistory, saved.gpuUtil);
+    fill(gpuDedicatedHistory, saved.gpuDedicated);
+    fill(gpuSharedHistory, saved.gpuShared);
+    fill(gpuPowerHistory, saved.gpuPower);
+    if (typeof saved.gpuMemTotal === "number") gpuMemTotal = saved.gpuMemTotal;
+  } catch { /* corrupt payload — start fresh */ }
 }
 
 function renderSpark(value) {
@@ -152,6 +196,7 @@ function renderSystem(data) {
   renderLineChart($("cpuChart"), cpuHistory, "#c78f2d");
   renderLineChart($("memoryChart"), memoryHistory, "#286f9b");
   setText("statusText", `System ${new Date(data.at).toLocaleTimeString("zh-CN")}`);
+  saveHistory();
 }
 
 function renderDrive(data) {
@@ -181,8 +226,8 @@ function renderBalance(deepseek) {
   list.innerHTML = infos.length
     ? infos.map((item) => `
       <div class="balance-item">
-        <span>${item.currency}</span>
-        <b>${item.total_balance}</b>
+        <span>${esc(item.currency)}</span>
+        <b>${esc(item.total_balance)}</b>
       </div>
     `).join("")
     : `<div class="balance-item"><span>No balance details</span><b>--</b></div>`;
@@ -191,7 +236,7 @@ function renderBalance(deepseek) {
   daily.innerHTML = items.length
     ? items.map((item) => `
       <div class="daily-item">
-        <span>${item.currency}</span>
+        <span>${esc(item.currency)}</span>
         <b>${money(item.used)}</b>
       </div>
     `).join("")
@@ -230,6 +275,18 @@ async function loadDeepSeek() {
   }
 }
 
+function gpuPowerCeiling() {
+  return Math.ceil(Math.max(10, ...gpuPowerHistory, 50) / 50) * 50;
+}
+
+function gpuSharedCeiling() {
+  return Math.ceil((Math.max(256, ...gpuSharedHistory) * 2) / 256) * 256;
+}
+
+function gpuMemCeiling() {
+  return gpuMemTotal > 0 ? gpuMemTotal : 16384;
+}
+
 function renderGpu(data) {
   const util = data.utilization_gpu;
   const memUsed = data.memory.dedicated_used_mb;
@@ -249,19 +306,15 @@ function renderGpu(data) {
   setText("gpuPowerValue", `${powerDraw}W`);
   renderLineChart($("gpuUtilChart"), gpuUtilHistory, "#c78f2d");
 
-  const maxPower = Math.max(10, ...gpuPowerHistory, 50);
-  const powerCeiling = Math.ceil(maxPower / 50) * 50;
-  renderLineChart($("gpuPowerChart"), gpuPowerHistory, "#e06040", powerCeiling);
+  renderLineChart($("gpuPowerChart"), gpuPowerHistory, "#e06040", gpuPowerCeiling());
 
   // Row 2: GPU Dedicated Memory + GPU Shared Memory (separate charts with values)
   setText("gpuDedicatedValue", `${(memUsed / 1024).toFixed(1)} / ${(memTotal / 1024).toFixed(1)} GB`);
   setText("gpuSharedValue", `${memShared.toFixed(1)} MiB`);
 
-  const memCeiling = memTotal > 0 ? memTotal : 16384;
-  renderLineChart($("gpuDedicatedChart"), gpuDedicatedHistory, "#c78f2d", memCeiling);
-
-  const sharedCeiling = Math.max(memShared * 2, 256, ...gpuSharedHistory);
-  renderLineChart($("gpuSharedChart"), gpuSharedHistory, "#237a57", Math.ceil(sharedCeiling / 256) * 256);
+  renderLineChart($("gpuDedicatedChart"), gpuDedicatedHistory, "#c78f2d", gpuMemCeiling());
+  renderLineChart($("gpuSharedChart"), gpuSharedHistory, "#237a57", gpuSharedCeiling());
+  saveHistory();
 }
 
 async function loadGpu() {
@@ -282,10 +335,10 @@ function renderProcessTable(tbodyId, list) {
     .map((proc, i) => `
       <tr>
         <td class="rank">${i + 1}</td>
-        <td class="proc-name" title="${proc.Name}">${proc.Name}</td>
-        <td>${proc.Id}</td>
-        <td>${proc.CPU}</td>
-        <td>${proc.MemMB}</td>
+        <td class="proc-name" title="${esc(proc.Name)}">${esc(proc.Name)}</td>
+        <td>${esc(proc.Id)}</td>
+        <td>${esc(proc.CPU)}</td>
+        <td>${esc(proc.MemMB)}</td>
       </tr>
     `)
     .join("");
@@ -307,18 +360,9 @@ function refreshCharts() {
   renderLineChart($("cpuChart"), cpuHistory, "#c78f2d");
   renderLineChart($("memoryChart"), memoryHistory, "#286f9b");
   if (gpuUtilHistory.length > 0) renderLineChart($("gpuUtilChart"), gpuUtilHistory, "#c78f2d");
-  if (gpuPowerHistory.length > 0) {
-    const maxPower = Math.max(10, ...gpuPowerHistory, 50);
-    renderLineChart($("gpuPowerChart"), gpuPowerHistory, "#e06040", Math.ceil(maxPower / 50) * 50);
-  }
-  if (gpuDedicatedHistory.length > 0) {
-    const memCeiling = gpuMemTotal > 0 ? gpuMemTotal : 16384;
-    renderLineChart($("gpuDedicatedChart"), gpuDedicatedHistory, "#c78f2d", memCeiling);
-  }
-  if (gpuSharedHistory.length > 0) {
-    const sharedCeiling = Math.max(...gpuSharedHistory, 256) * 2;
-    renderLineChart($("gpuSharedChart"), gpuSharedHistory, "#237a57", Math.ceil(sharedCeiling / 256) * 256);
-  }
+  if (gpuPowerHistory.length > 0) renderLineChart($("gpuPowerChart"), gpuPowerHistory, "#e06040", gpuPowerCeiling());
+  if (gpuDedicatedHistory.length > 0) renderLineChart($("gpuDedicatedChart"), gpuDedicatedHistory, "#c78f2d", gpuMemCeiling());
+  if (gpuSharedHistory.length > 0) renderLineChart($("gpuSharedChart"), gpuSharedHistory, "#237a57", gpuSharedCeiling());
 }
 
 async function loadReports() {
@@ -352,23 +396,23 @@ function renderReports(reports) {
     const id = `report-${i}`;
     const wasOpen = openFiles.has(r.file);
     return `
-      <div class="report-item${wasOpen ? ' open' : ''}" id="${id}" data-file="${r.file}">
-        <button class="report-toggle" onclick="toggleReport('${id}','${r.file}')">
+      <div class="report-item${wasOpen ? ' open' : ''}" id="${id}" data-file="${esc(r.file)}">
+        <button class="report-toggle" onclick="toggleReport('${id}')">
           <div class="report-meta">
-            <span class="report-period">${label}</span>
-            <span class="report-size">${size}</span>
+            <span class="report-period">${esc(label)}</span>
+            <span class="report-size">${esc(size)}</span>
           </div>
           <span class="toggle-icon">▼</span>
         </button>
         <div class="report-body">
-          <iframe src="${wasOpen ? '/reports/' + r.file : 'about:blank'}" data-src="/reports/${r.file}"></iframe>
+          <iframe src="${wasOpen ? '/reports/' + encodeURIComponent(r.file) : 'about:blank'}" data-src="/reports/${encodeURIComponent(r.file)}"></iframe>
         </div>
       </div>
     `;
   }).join("");
 }
 
-function toggleReport(id, file) {
+function toggleReport(id) {
   const item = document.getElementById(id);
   const isOpen = item.classList.contains("open");
   const iframe = item.querySelector("iframe");
@@ -383,6 +427,11 @@ function toggleReport(id, file) {
     iframe.src = iframe.dataset.src;
   }
 }
+
+// Seed charts from the last saved session so they render full immediately.
+restoreHistory();
+renderSpark();
+refreshCharts();
 
 loadSystem();
 loadDrive();

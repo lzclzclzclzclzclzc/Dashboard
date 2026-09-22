@@ -52,9 +52,17 @@ async function getDeepSeekBalance() {
     return { ok: false, status: 0, message: "DEEPSEEK_API_KEY is not configured.", data: null };
   }
   try {
-    const response = await fetch("https://api.deepseek.com/user/balance", {
-      headers: { Accept: "application/json", Authorization: `Bearer ${config.DEEPSEEK_API_KEY}` },
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+    let response;
+    try {
+      response = await fetch("https://api.deepseek.com/user/balance", {
+        headers: { Accept: "application/json", Authorization: `Bearer ${config.DEEPSEEK_API_KEY}` },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
     const text = await response.text();
     let data = null;
     try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
