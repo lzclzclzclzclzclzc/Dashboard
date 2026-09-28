@@ -1,13 +1,10 @@
-const { execFile } = require("child_process");
-const { promisify } = require("util");
+const { execFileAsync } = require("../lib/command");
 const { sendJson, getDriveShape } = require("../lib/util");
-
-const execFileAsync = promisify(execFile);
 
 async function getDriveUsage() {
   if (process.platform === "win32") {
     const { stdout } = await execFileAsync("powershell", [
-      "-NoProfile", "-Command",
+      "-NoProfile", "-NonInteractive", "-Command",
       "$d=[System.IO.DriveInfo]::new('C'); [pscustomobject]@{Size=$d.TotalSize;FreeSpace=$d.AvailableFreeSpace} | ConvertTo-Json -Compress",
     ], { timeout: 5000 });
     const disk = JSON.parse(stdout.trim() || "{}");

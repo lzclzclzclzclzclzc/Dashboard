@@ -2,9 +2,6 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
-// silence all console output
-["log", "error", "warn", "info", "debug"].forEach(k => { console[k] = () => {}; });
-
 // load .env before any config module reads it
 (function loadEnv(file) {
   if (!fs.existsSync(file)) return;
@@ -19,7 +16,8 @@ const path = require("path");
 })(path.join(__dirname, ".env"));
 
 const config = require("./lib/config");
-require("./logger");
+const logger = require("./logger");
+const { stopCommands } = require("./lib/command");
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -87,6 +85,43 @@ const server = http.createServer(async (req, res) => {
     }
   }
 });
+
+let shuttingDown = false;
+
+function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[server] ${signal}: stopping Dashboard`);
+
+  // Bound shutdown even if a hardware request or a connection is stuck.
+  const deadline = setTimeout(() => process.exit(0), 3000);
+  deadline.unref();
+
+  stopCommands();
+  logger.stop();
+  server.close(() => {
+    clearTimeout(deadline);
+    process.exit(0);
+  });
+  server.closeAllConnections?.();
+}
+
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+// Windows terminals may deliver Ctrl+C as input instead of a signal.
+if (process.platform === "win32" && process.stdin.isTTY) {
+  const originalRawMode = Boolean(process.stdin.isRaw);
+  process.stdin.setRawMode(true);
+  process.stdin.on("data", (input) => {
+    if (input.includes(3)) shutdown("SIGINT");
+  });
+  process.stdin.resume();
+  process.once("exit", () => {
+    process.stdin.setRawMode(originalRawMode);
+    process.stdin.pause();
+  });
+}
 
 server.listen(config.PORT, () => {
   console.log(`Dashboard running at http://localhost:${config.PORT}`);

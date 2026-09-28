@@ -1,9 +1,8 @@
-const { execFile } = require("child_process");
-const { promisify } = require("util");
+const { execFileAsync } = require("../lib/command");
+const { DEBUG_LOGS } = require("../lib/config");
 const Cache = require("../lib/cache");
 const { sendJson } = require("../lib/util");
 
-const execFileAsync = promisify(execFile);
 const cache = new Cache();
 
 let gpuInstanceName = null;
@@ -12,13 +11,13 @@ async function discoverGpuInstance() {
   if (gpuInstanceName) return gpuInstanceName;
   try {
     const { stdout } = await execFileAsync("powershell", [
-      "-NoProfile", "-Command",
+      "-NoProfile", "-NonInteractive", "-Command",
       "(Get-Counter '\\GPU Adapter Memory(*)\\Dedicated Usage' -ErrorAction SilentlyContinue).CounterSamples | Where-Object { $_.CookedValue -gt 0 } | ForEach-Object { $_.InstanceName } | Select-Object -First 1",
     ], { timeout: 4000 });
     gpuInstanceName = stdout.trim();
-    if (gpuInstanceName) console.log(`[gpu] discovered GPU perf instance: ${gpuInstanceName}`);
+    if (DEBUG_LOGS && gpuInstanceName) console.log(`[gpu] discovered GPU perf instance: ${gpuInstanceName}`);
   } catch (err) {
-    console.error(`[gpu] failed to discover GPU perf instance: ${err.message}`);
+    if (DEBUG_LOGS) console.error(`[gpu] failed to discover GPU perf instance: ${err.message}`);
   }
   return gpuInstanceName;
 }
@@ -53,7 +52,7 @@ async function getGpuMetrics() {
     if (instance) {
       try {
         const { stdout: sharedOut } = await execFileAsync("powershell", [
-          "-NoProfile", "-Command",
+          "-NoProfile", "-NonInteractive", "-Command",
           `(Get-Counter "\\GPU Adapter Memory(${instance})\\Shared Usage" -ErrorAction SilentlyContinue).CounterSamples | Select-Object -ExpandProperty CookedValue`,
         ], { timeout: 4000 });
         const rawShared = parseFloat(sharedOut.trim());

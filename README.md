@@ -85,6 +85,10 @@ http://localhost:3000
 
 ## Notes
 
+The terminal shows startup, shutdown, and fatal errors by default. Repeated hardware
+and telemetry collection errors are quiet. To troubleshoot them, set `DEBUG_LOGS=1`
+in `.env` and restart the server.
+
 DeepSeek daily usage is calculated as:
 
 ```text

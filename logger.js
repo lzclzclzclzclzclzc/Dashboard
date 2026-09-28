@@ -1,6 +1,7 @@
 const Database = require("better-sqlite3");
 const path = require("path");
 const http = require("http");
+const { DEBUG_LOGS } = require("./lib/config");
 
 const DB_PATH = path.join(__dirname, "data", "telemetry.db");
 const POLL_MS = 60_000;
@@ -10,6 +11,8 @@ const BASE_URL = `http://localhost:${process.env.PORT || 3000}`;
 let db;
 let timer;
 let polling = false;
+let stopped = false;
+const requests = new Set();
 
 function init() {
   db = new Database(DB_PATH);
@@ -66,7 +69,7 @@ function schedule() {
 }
 
 async function pollAndInsert() {
-  if (polling) return; // skip if the previous cycle hasn't finished (avoids overlapping polls piling up)
+  if (stopped || polling) return;
   polling = true;
   try {
     const [system, drive, deepseek, processes, gpu] = await Promise.all([
@@ -76,6 +79,8 @@ async function pollAndInsert() {
       fetchJson("/api/processes"),
       fetchJson("/api/gpu")
     ]);
+
+    if (stopped) return;
 
     const ts = localTimestamp();
     const memUsed = (system.memory?.used || 0) / (1024 ** 3);
@@ -129,7 +134,7 @@ async function pollAndInsert() {
     ).run({ days: RETENTION_DAYS });
 
   } catch (err) {
-    console.error(`[logger] poll error: ${err.message}`);
+    if (!stopped && DEBUG_LOGS) console.error(`[logger] poll error: ${err.message}`);
   } finally {
     polling = false;
   }
@@ -137,7 +142,7 @@ async function pollAndInsert() {
 
 function fetchJson(pathname) {
   return new Promise((resolve, reject) => {
-    const req = http.get(`${BASE_URL}${pathname}`, { headers: { "Cache-Control": "no-store" } }, (res) => {
+    const request = http.get(`${BASE_URL}${pathname}`, { headers: { "Cache-Control": "no-store" } }, (res) => {
       let body = "";
       res.on("data", (chunk) => (body += chunk));
       res.on("end", () => {
@@ -148,8 +153,10 @@ function fetchJson(pathname) {
         }
       });
     });
-    req.on("error", reject);
-    req.setTimeout(15000, () => req.destroy(new Error(`Timeout fetching ${pathname}`)));
+    request.on("error", reject);
+    request.setTimeout(15000, () => request.destroy(new Error(`Timeout fetching ${pathname}`)));
+    requests.add(request);
+    request.once("close", () => requests.delete(request));
   });
 }
 
@@ -173,10 +180,13 @@ function round2(n) {
 }
 
 function stop() {
+  stopped = true;
   if (timer) {
     clearInterval(timer);
     timer = null;
   }
+  for (const request of requests) request.destroy();
+  requests.clear();
   if (db) {
     db.close();
     db = null;
@@ -185,11 +195,7 @@ function stop() {
 }
 
 process.on("exit", stop);
-process.on("SIGINT", stop);
-process.on("SIGTERM", stop);
-process.on("uncaughtException", (err) => {
-  console.error(`[logger] uncaught: ${err.message}`);
-  stop();
-});
+
+module.exports = { stop };
 
 init();
