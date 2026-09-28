@@ -494,14 +494,6 @@ new Chart(document.getElementById('chartDisk'), {{type:'line',data:{{labels:ts,d
     return html
 
 # ── Utilities ───────────────────────────────────────────────────────
-def prune_old_reports(reports_dir, keep=3):
-    if not os.path.isdir(reports_dir): return
-    files = sorted([f for f in os.listdir(reports_dir) if f.endswith(".html")],
-                   key=lambda f: os.path.getmtime(os.path.join(reports_dir, f)), reverse=True)
-    for old in files[keep:]:
-        os.remove(os.path.join(reports_dir, old))
-        print(f"Pruned old report: {old}", file=sys.stderr)
-
 # ── Main ────────────────────────────────────────────────────────────
 def main():
     p = argparse.ArgumentParser(description="Telemetry report — two-stage extract/render, or one-shot fallback")
@@ -552,7 +544,6 @@ def main():
         dashboard_root = os.path.dirname(db_dir)
         reports_dir = os.path.join(dashboard_root, "public", "reports")
         os.makedirs(reports_dir, exist_ok=True)
-        prune_old_reports(reports_dir, keep=3)
         ts_str = datetime.now().strftime("%Y-%m-%d_%H-%M")
         out = os.path.join(reports_dir, f"report_{ts_str}.html")
 
